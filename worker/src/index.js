@@ -61,9 +61,6 @@ function createClient(supabaseUrl, supabaseKey) {
             return { data: null, error: e };
           }
         },
-        async select() {
-          return client;
-        },
         async insert(data) {
           const url = `${supabaseUrl}/rest/v1/${table}`;
           try {
