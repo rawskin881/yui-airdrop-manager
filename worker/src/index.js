@@ -284,9 +284,24 @@ function scoreBadge(s) {
   return "💤 LOW";
 }
 
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-//  SECTION 3: SUPABASE HELPERS (ADAPTED FROM KV)
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+function checklistProgress(tasks) {
+  let taskList = [];
+  if (typeof tasks === "string") {
+    try {
+      taskList = JSON.parse(tasks);
+    } catch (e) {
+      taskList = [];
+    }
+  } else if (Array.isArray(tasks)) {
+    taskList = tasks;
+  }
+  if (!Array.isArray(taskList)) {
+    taskList = [];
+  }
+  const total = taskList.length;
+  const done = taskList.filter(t => t && t.done).length;
+  return { done, total };
+}
 
 async function getAirdrops(supabase, chatId) {
   const { data, error } = await supabase
