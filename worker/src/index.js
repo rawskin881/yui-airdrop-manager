@@ -13,6 +13,8 @@ function createClient(supabaseUrl, supabaseKey) {
       let filters = [];
       let orderBy = "";
       let isHead = false;
+      let method = "GET";
+      let body = null;
 
       const client = {
         select(fields = "*", options = {}) {
@@ -45,8 +47,9 @@ function createClient(supabaseUrl, supabaseKey) {
           const url = `${supabaseUrl}/rest/v1/${table}?${[...queryParams, ...filters, orderBy].filter(Boolean).join("&")}`;
           try {
             const res = await fetch(url, {
-              method: "GET",
-              headers: { ...headers, "Accept": "application/vnd.pgrst.object+json" }
+              method: method,
+              headers: { ...headers, "Accept": "application/vnd.pgrst.object+json" },
+              body: body ? JSON.stringify(body) : null
             });
             if (res.status === 406) {
               return { data: null, error: null };
@@ -114,52 +117,44 @@ function createClient(supabaseUrl, supabaseKey) {
             return { data: null, error: e };
           }
         },
-        async update(data) {
-          const url = `${supabaseUrl}/rest/v1/${table}?${filters.join("&")}`;
-          try {
-            const res = await fetch(url, {
-              method: "PATCH",
-              headers,
-              body: JSON.stringify(data)
-            });
-            if (!res.ok) {
-              const err = await res.json();
-              return { data: null, error: err };
-            }
-            const updated = await res.json();
-            return { data: updated, error: null };
-          } catch (e) {
-            return { data: null, error: e };
-          }
+        update(data) {
+          method = "PATCH";
+          body = data;
+          headers["Prefer"] = "return=representation";
+          return client;
         },
-        async delete() {
-          const url = `${supabaseUrl}/rest/v1/${table}?${filters.join("&")}`;
-          try {
-            const res = await fetch(url, {
-              method: "DELETE",
-              headers
-            });
-            if (!res.ok) {
-              const err = await res.json();
-              return { data: null, error: err };
-            }
-            return { data: null, error: null };
-          } catch (e) {
-            return { data: null, error: e };
-          }
+        delete() {
+          method = "DELETE";
+          return client;
         },
         then(resolve) {
           const execute = async () => {
             const url = `${supabaseUrl}/rest/v1/${table}?${[...queryParams, ...filters, orderBy].filter(Boolean).join("&")}`;
-            const method = isHead ? "HEAD" : "GET";
+            const reqMethod = isHead ? "HEAD" : method;
             try {
-              const res = await fetch(url, { method, headers });
+              const res = await fetch(url, { 
+                method: reqMethod, 
+                headers,
+                body: body ? JSON.stringify(body) : null
+              });
               if (!res.ok) {
-                return { data: null, error: new Error("Request failed"), count: 0 };
+                const errText = await res.text();
+                return { data: null, error: new Error(errText || "Request failed"), count: 0 };
               }
               const countHeader = res.headers.get("Content-Range") || "";
               const count = countHeader ? parseInt(countHeader.split("/")[1]) : 0;
-              const data = isHead ? null : await res.json();
+              
+              let data = null;
+              if (res.status !== 204 && reqMethod !== "HEAD") {
+                const text = await res.text();
+                if (text) {
+                  try {
+                    data = JSON.parse(text);
+                  } catch (e) {
+                    data = text;
+                  }
+                }
+              }
               return { data, error: null, count };
             } catch (e) {
               return { data: null, error: e, count: 0 };
